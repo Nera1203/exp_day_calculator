@@ -16,8 +16,22 @@
             font-size: 20px !important; /* Googleサイト埋め込み対応 */
         }
         .input-group { margin-bottom: 15px; }
-        label { display: block; margin-top: 10px; font-weight: bold; color: #555; }
-        input[type="number"] { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        label { 
+            display: block; 
+            margin-top: 10px; 
+            font-weight: bold; 
+            color: #555; 
+            font-size: 16px; /* 文字サイズを大きくしました */
+        }
+        input[type="number"] { 
+            width: 100%; 
+            padding: 10px; 
+            margin-top: 5px; 
+            border: 1px solid #ccc; 
+            border-radius: 5px; 
+            box-sizing: border-box; 
+            font-size: 16px; /* 文字サイズを大きくしました */
+        }
         button { background-color: #5a4b70; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px; width: 100%; font-size: 16px; transition: background-color 0.3s; }
         button:hover { background-color: #7b6a9a; }
         .result-box { margin-top: 30px; padding: 15px; border: 2px solid #76c7c0; border-radius: 5px; background-color: #e6f7ff; text-align: center; }
@@ -32,8 +46,8 @@
     <h1>Lvアップ到達日数計算機</h1>
     
     <div class="input-group">
-        <label for="startLevel">現在のレベル (70〜91):</label>
-        <input type="number" id="startLevel" value="70" min="70" max="91">
+        <label for="startLevel">現在のレベル (70〜92):</label>
+        <input type="number" id="startLevel" value="70" min="70" max="92">
     </div>
     <div class="input-group">
         <label for="startExpPercent">現在の経験値 % (0.00〜99.99):</label>
@@ -41,8 +55,8 @@
     </div>
 
     <div class="input-group">
-        <label for="targetLevel">目標レベル (71〜92):</label>
-        <input type="number" id="targetLevel" value="80" min="71" max="92">
+        <label for="targetLevel">目標レベル (71〜93):</label>
+        <input type="number" id="targetLevel" value="80" min="71" max="93">
     </div>
     
     <div class="input-group">
@@ -87,8 +101,10 @@
         88: 466158342576,
         89: 1684633370304,
         90: 7458533481216,
+        // *** ユーザー提供データに更新しました ***
         91: 36362347267020,
-        92: 218174083602140,
+        92: 218174083602140
+        // **********************************
     };
 
     /**
@@ -108,8 +124,8 @@
         resultBox.style.display = 'none';
         
         // --- 検証 ---
-        if (startLevel < 70 || targetLevel > 92 || startLevel >= targetLevel || EXP_TABLE[startLevel] === undefined) {
-            resultMessage.textContent = 'エラー: Lv設定を確認してください (開始Lv: 70-91, 目標Lv: 71-92, 開始Lv < 目標Lv)。';
+        if (startLevel < 70 || targetLevel > 93 || startLevel >= targetLevel || EXP_TABLE[startLevel] === undefined) {
+            resultMessage.textContent = 'エラー: Lv設定を確認してください (開始Lv: 70-92, 目標Lv: 71-93, 開始Lv < 目標Lv)。';
             resultMessage.style.display = 'block';
             return;
         }
@@ -135,7 +151,6 @@
         }
         
         // 3. 1日あたりの目標獲得経験値（実数値）を計算
-        // ここが重要：日々の獲得EXPは「そのLvの獲得EXP」に対する割合として概算する。
         // 目標Lvに到達するまでのLvで最もコストの高いLvのコストを基準とします。
         
         let maxExpCost = 0;
@@ -146,7 +161,6 @@
         }
         
         // 1日あたりの獲得経験値（実数値） = 最大コスト * (1日の目標獲得経験値% / 100)
-        // ※この概算方法が、ユーザー入力（Lv内の%）との整合性が最も高くなります。
         const dailyExpIncrease = maxExpCost * (dailyExpPercent / 100.0);
         
         if (dailyExpIncrease === 0) {
@@ -174,13 +188,11 @@
 
     // 初期値設定 (Googleサイト埋め込み時も動作するように)
     window.onload = function() {
-        // 現在の日付に依存しないため、特に日付の初期設定は不要。
-        // 入力値の範囲調整
-        document.getElementById('startLevel').max = 91;
+        // 入力値の範囲を最新の経験値テーブルに合わせて調整
+        document.getElementById('startLevel').max = 92;
         document.getElementById('targetLevel').min = 71;
-        document.getElementById('targetLevel').max = 92;
+        document.getElementById('targetLevel').max = 93;
     };
 </script>
 </body>
 </html>
-
