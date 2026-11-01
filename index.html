@@ -1,62 +1,298 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>リネージュM Lvアップ到達日数計算機</title><style>
-body{font-family:'Segoe UI',Tahoma,sans-serif;margin:20px;background:#f4f7f6;color:#333}.container{max-width:500px;margin:auto;background:white;padding:20px 30px;border-radius:10px;box-shadow:0 4px 12px #0002}h1{color:#5a4b70;text-align:center;border-bottom:2px solid #5a4b70;padding-bottom:10px;font-size:20px!important}.input-group{margin-bottom:15px}label{display:block;margin-top:10px;font-weight:bold;color:#555;font-size:16px}input[type=number],input[type=date],select{width:100%;padding:10px;margin-top:5px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;font-size:16px;background:#fff}.input-wrapper{position:relative;display:flex;align-items:center}.input-suffix{position:absolute;right:12px;color:#888;pointer-events:none}.input-wrapper input{padding-right:35px}button{background:#5a4b70;color:#fff;padding:12px;border:0;border-radius:5px;cursor:pointer;margin-top:20px;width:100%;font-size:16px}button:hover{background:#7b6a9a}.result-box{margin-top:25px;padding:15px;border:2px solid #76c7c0;border-radius:5px;background:#e6f7ff;text-align:center}.result-title{font-size:1.1em;font-weight:bold;color:#5a4b70;margin:10px 0 5px}.result-value{font-size:1.65em;font-weight:bold;color:#208d65}.error{color:#c33;font-weight:bold;margin-top:15px;text-align:center}.hint{display:block;color:#777;margin-top:5px;font-size:12px;line-height:1.6}.details{font-size:13px;color:#555;line-height:1.7;margin-top:12px}.notice{font-size:12px;color:#777;line-height:1.6;margin-top:18px}
-</style></head><body><div class="container"><h1>Lvアップ到達日数計算機</h1>
-<div class="input-group"><label for="startLevel">現在のレベル (70〜92)</label><input type="number" id="startLevel" value="74" min="70" max="92" step="1"></div>
-<div class="input-group"><label for="startExpPercent">現在の経験値 (0〜99.99%)</label><div class="input-wrapper"><input type="number" id="startExpPercent" value="88" min="0" max="99.99" step="0.01"><span class="input-suffix">%</span></div></div>
-<div class="input-group"><label for="targetLevel">目標レベル (71〜93)</label><input type="number" id="targetLevel" value="80" min="71" max="93" step="1"></div>
-<div class="input-group"><label for="dailyExpPercent">1日の獲得経験値（現在のLv換算）</label><div class="input-wrapper"><input type="number" id="dailyExpPercent" value="80" min="0.000001" step="any"><span class="input-suffix">%</span></div><small class="hint">現在のLvで1日に80%稼ぐなら「80」。レベルアップ後も同じ絶対経験値を獲得すると仮定します。</small></div>
-<div class="input-group"><label for="startDate">計算基準日</label><input type="date" id="startDate"></div>
-<div class="input-group"><label for="firstDay">経験値を獲得し始める日</label><select id="firstDay"><option value="1" selected>翌日から（今日は消化済み）</option><option value="0">当日から</option></select></div>
-<button id="calcButton" type="button">到達日数を計算</button><div id="resultMessage" class="error" role="alert" hidden></div>
-<div id="resultBox" class="result-box" hidden><div class="result-title">目標到達日</div><div id="targetDate" class="result-value"></div><div class="result-title">必要な獲得日数</div><div id="totalDays" class="result-value"></div><div id="details" class="details"></div></div>
-<p class="notice">経験値テーブル：韓国Inven計算機を参考にした暫定値。Lv70〜89は提供されたExcelの値、Lv90〜93は会話内で確認した2026年版v3.43の値を使用。日本版の公式値とは限りません。Lv90以降は配信者の死亡ロスト逆算値と約0.85%の差があります。</p></div>
-<script>
-const EXP_TABLE={
-    70: 3550718780,
-    71: 4233683820,
-    72: 5029342883,
-    73: 5953649898,
-    74: 7024482619,
-    75: 8261837524,
-    76: 9688040963,
-    77: 11327977600,
-    78: 13209337337,
-    79: 15362881827,
-    80: 17822734896,
-    81: 20001626310,
-    82: 22415537902,
-    83: 25096518006,
-    84: 28038385232,
-    85: 31296843514,
-    86: 93890530542,
-    87: 375562122168,
-    88: 1502248488672,
-    89: 6008993954688,
-    90: 36053963728128,
-    91: 216323782368768,
-    92: 648971347106304,
-    93: 1297942694212608
-};
-const $=id=>document.getElementById(id);
-const pad=n=>String(n).padStart(2,'0');
-function localToday(){const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
-function calculateDays(){
- $('resultMessage').hidden=true;$('resultBox').hidden=true;
- const start=Number($('startLevel').value),target=Number($('targetLevel').value),pct=Number($('startExpPercent').value),dailyPct=Number($('dailyExpPercent').value);
- const dateText=$('startDate').value;
- const valid=Number.isInteger(start)&&Number.isInteger(target)&&start>=70&&start<=92&&target>=71&&target<=93&&target>start&&Number.isFinite(pct)&&pct>=0&&pct<100&&Number.isFinite(dailyPct)&&dailyPct>0&&/^\d{4}-\d{2}-\d{2}$/.test(dateText);
- if(!valid){$('resultMessage').textContent='レベル・経験値率・基準日を確認してください。';$('resultMessage').hidden=false;return;}
- let required=EXP_TABLE[start]*(1-pct/100);
- for(let lv=start+1;lv<target;lv++)required+=EXP_TABLE[lv];
- const daily=EXP_TABLE[start]*dailyPct/100;
- const days=Math.ceil(required/daily-1e-12);
- if(!Number.isFinite(days)||days>10000000){$('resultMessage').textContent='計算可能な範囲を超えました。';$('resultMessage').hidden=false;return;}
- const [y,m,d]=dateText.split('-').map(Number);
- const arrival=new Date(y,m-1,d+Number($('firstDay').value)+days-1,12);
- $('targetDate').textContent=arrival.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
- $('totalDays').textContent=`${days.toLocaleString('ja-JP')}日`;
- $('details').textContent=`残り必要経験値：約${Math.round(required).toLocaleString('ja-JP')} ／ 1日：約${Math.round(daily).toLocaleString('ja-JP')}（現在のLv${start}基準）`;
- $('resultBox').hidden=false;
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>リネージュM Lvアップ到達日数計算機</title>
+<style>
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 20px;
+  background-color: #f4f7f6;
+  color: #333;
 }
-$('startDate').value=localToday();$('calcButton').addEventListener('click',calculateDays);calculateDays();
-</script></body></html>
+.container {
+  max-width: 500px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 20px 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+}
+h1 {
+  color: #5a4b70;
+  text-align: center;
+  border-bottom: 2px solid #5a4b70;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+  font-size: 20px !important;
+}
+.input-group { margin-bottom: 15px; }
+label {
+  display: block;
+  margin-top: 10px;
+  font-weight: bold;
+  color: #555;
+  font-size: 16px;
+}
+input[type="number"], select {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box;
+  font-size: 16px;
+  background: white;
+}
+.input-wrapper { position: relative; }
+.input-wrapper input { padding-right: 30px; }
+.input-suffix {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-40%);
+  color: #888;
+  pointer-events: none;
+}
+button {
+  background: #5a4b70;
+  color: white;
+  padding: 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 20px;
+  width: 100%;
+  font-size: 16px;
+}
+button:hover { background: #7b6a9a; }
+.result-box {
+  margin-top: 30px;
+  padding: 15px;
+  border: 2px solid #76c7c0;
+  border-radius: 5px;
+  background: #e6f7ff;
+  text-align: center;
+}
+.result-title {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #5a4b70;
+  margin-bottom: 5px;
+}
+.result-value {
+  font-size: 1.8em;
+  font-weight: bold;
+  color: #2ecc71;
+}
+.error {
+  color: #e74c3c;
+  font-weight: bold;
+  margin-top: 15px;
+  text-align: center;
+}
+small {
+  display: block;
+  color: #777;
+  margin-top: 5px;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Lvアップ到達日数計算機</h1>
+
+  <div class="input-group">
+    <label for="startLevel">現在のレベル (70〜92):</label>
+    <input type="number" id="startLevel"
+      value="70" min="70" max="92" step="1">
+  </div>
+
+  <div class="input-group">
+    <label for="startExpPercent">
+      現在の経験値 % (0.00〜99.99):
+    </label>
+    <div class="input-wrapper">
+      <input type="number" id="startExpPercent"
+        value="0.00" min="0" max="99.99" step="0.01">
+      <span class="input-suffix">%</span>
+    </div>
+  </div>
+
+  <div class="input-group">
+    <label for="targetLevel">目標レベル (71〜93):</label>
+    <input type="number" id="targetLevel"
+      value="80" min="71" max="93" step="1">
+  </div>
+
+  <div class="input-group">
+    <label for="dailyExpPercent">
+      1日の獲得経験値 %
+    </label>
+    <div class="input-wrapper">
+      <input type="number" id="dailyExpPercent"
+        value="0.15" min="0.01" step="0.01">
+      <span class="input-suffix">%</span>
+    </div>
+    <small>
+      現在のレベルで1日に獲得できる経験値率を入力。
+      レベルアップ後も同じ経験値量を獲得する計算です。
+    </small>
+  </div>
+
+  <div class="input-group">
+    <label for="startTiming">経験値の取得開始</label>
+    <select id="startTiming">
+      <option value="0" selected>今日から</option>
+      <option value="1">明日から</option>
+    </select>
+  </div>
+
+  <button onclick="calculateDays()">到達日数を計算</button>
+
+  <div id="resultMessage" class="error"
+    style="display:none;"></div>
+
+  <div id="resultBox" class="result-box"
+    style="display:none;">
+    <div class="result-title">目標到達日</div>
+    <div id="targetDate" class="result-value"></div>
+    <div class="result-title" style="margin-top:10px;">
+      到達までの合計日数
+    </div>
+    <div id="totalDays" class="result-value"></div>
+  </div>
+
+  <small style="margin-top:20px;">
+    ※韓国版ユーザー制作資料を参考にした概算です。
+    日本版との完全一致は未確認です。
+    Lv71〜79には未照合の暫定値を含みます。
+  </small>
+</div>
+
+<script>
+// Lvから次のLvへの必要経験値
+const EXP_TABLE = {
+  70: 3550718780,
+  71: 4203633183,
+  72: 5029842893,
+  73: 5939314180,
+  74: 6965402260,
+  75: 8261837524,
+  76: 9459816688,
+  77: 10940822831,
+  78: 12630907937,
+  79: 15362882171,
+  80: 17822734896,
+  81: 20001626310,
+  82: 22415537902,
+  83: 25096518006,
+  84: 28038385232,
+  85: 31296843514,
+  86: 93890530542,
+  87: 375562122168,
+  88: 1502248488672,
+  89: 6008993954688,
+  90: 36053963728128,
+  91: 216323782368768,
+  92: 648971347106304
+};
+
+function calculateDays() {
+  const startLevel =
+    Number(document.getElementById('startLevel').value);
+  const startPercent =
+    Number(document.getElementById('startExpPercent').value);
+  const targetLevel =
+    Number(document.getElementById('targetLevel').value);
+  const dailyPercent =
+    Number(document.getElementById('dailyExpPercent').value);
+  const startTiming =
+    Number(document.getElementById('startTiming').value);
+
+  const message = document.getElementById('resultMessage');
+  const result = document.getElementById('resultBox');
+
+  message.style.display = 'none';
+  result.style.display = 'none';
+
+  function showError(text) {
+    message.textContent = text;
+    message.style.display = 'block';
+  }
+
+  if (
+    !Number.isInteger(startLevel) ||
+    !Number.isInteger(targetLevel) ||
+    startLevel < 70 ||
+    startLevel > 92 ||
+    targetLevel <= startLevel ||
+    targetLevel > 93
+  ) {
+    showError('レベル設定を確認してください。');
+    return;
+  }
+
+  if (
+    !Number.isFinite(startPercent) ||
+    startPercent < 0 ||
+    startPercent >= 100 ||
+    !Number.isFinite(dailyPercent) ||
+    dailyPercent <= 0
+  ) {
+    showError('経験値率を正しく入力してください。');
+    return;
+  }
+
+  // 現在のLvを基準に1日の獲得経験値を固定
+  const dailyExp =
+    EXP_TABLE[startLevel] * dailyPercent / 100;
+
+  // 現在のLvの残り必要経験値
+  let requiredExp =
+    EXP_TABLE[startLevel] * (1 - startPercent / 100);
+
+  // 途中のLvで必要な経験値を加算
+  for (let lv = startLevel + 1; lv < targetLevel; lv++) {
+    if (EXP_TABLE[lv] === undefined) {
+      showError('必要経験値データがありません。');
+      return;
+    }
+    requiredExp += EXP_TABLE[lv];
+  }
+
+  // 必要なプレイ日数
+  const days = Math.ceil(requiredExp / dailyExp);
+
+  if (!Number.isFinite(days) || days < 1) {
+    showError('計算できませんでした。');
+    return;
+  }
+
+  // 今日からなら1日目は今日
+  // 明日からなら1日目は明日
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + startTiming + days - 1);
+
+  const dateString = date.toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short'
+  });
+
+  document.getElementById('targetDate').textContent =
+    dateString;
+
+  document.getElementById('totalDays').textContent =
+    days.toLocaleString('ja-JP') + ' 日';
+
+  result.style.display = 'block';
+}
+</script>
+</body>
+</html>
